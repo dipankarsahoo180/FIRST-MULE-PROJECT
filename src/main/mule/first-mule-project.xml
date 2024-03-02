@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:batch="http://www.mulesoft.org/schema/mule/batch"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="38e4128c-b24f-4758-8170-a6d13873abed" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<file:config name="File_Config" doc:name="File Config" doc:id="e23865fe-5aed-475e-b418-9f5d0f873364" />
+	<flow name="first-mule-projectFlow" doc:id="c753124b-5ff8-4b1d-889f-54a6059988ca" >
+		<http:listener doc:name="Listener" doc:id="474e2238-85e5-46ed-9006-613e86acbe46" config-ref="HTTP_Listener_config" path="/api/invoke/batch"/>
+		<ee:transform doc:name="Transform Message" doc:id="786b615c-4b12-48a0-9b94-72d3120d8fb4">
+						<ee:message>
+							<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload.data default []]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+		<batch:job jobName="first-mule-projectBatch_Job" doc:id="8f763557-4b9e-4156-a53f-8ff27d7bf3d5" maxFailedRecords="-1">
+			<batch:process-records >
+				<batch:step name="Batch_Step_Functional" doc:id="bd16aed6-47e9-43ad-b7b9-9e2873f6259d" >
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="c212a873-c169-42aa-8872-b8b4d49459a5" size="5">
+						<logger level="INFO" doc:name="Logger" doc:id="ad08f15d-50f5-45b2-8fda-6cee351c48ce" message="before transform" />
+						<ee:transform doc:name="Transform Message" doc:id="10928902-9b42-4953-b9ee-d0cc8032a2a2">
+						<ee:message>
+							<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload map (item) -> {
+	data: item.result as Number default 0 + 1
+}]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+						<logger level="INFO" doc:name="Logger1" doc:id="5d0523f0-245e-401e-971d-8c13c3fd380d" message="after transform" />
+						<logger level="INFO" doc:name="Logger2" doc:id="6221984b-2e26-4e02-9f40-ff5b53c6bb95" message="#[payload]" />
+					</batch:aggregator>
+					<ee:transform doc:name="Transform Message" doc:id="413663b1-2cd4-4329-922b-165bd7b82c60" >
+						<ee:message >
+							<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+				</batch:step>
+				<batch:step name="Batch_Step1" doc:id="6a86e218-caf8-4fb7-9936-6aeec1479cf5" acceptPolicy="ONLY_FAILURES">
+					<ee:transform doc:name="Transform Message" doc:id="d9449667-5c96-4766-b4db-05ba7d58f7dd">
+						<ee:message>
+							<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+Batch::getStepExceptions()]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+					<ee:transform doc:name="Transform Message" doc:id="84ef5ce0-8c91-4921-8d1d-310ff14eb1b6" >
+						<ee:message >
+							<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload.Batch_Step_Functional.verboseMessage]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="ae30c3ed-da31-431a-b423-e091a8b9b10f" size="2">
+						<ee:transform doc:name="Transform Message" doc:id="1b4ed463-4be3-48ec-a92c-65d8710436c9" >
+							<ee:message >
+								<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload map (item,index) ->
+{
+ErrorMessage:item
+}
+/*
+{
+errorList:payload,
+result:vars.records
+}
+*/]]></ee:set-payload>
+							</ee:message>
+						</ee:transform>
+						<logger level="INFO" doc:name="Logger" doc:id="c6ed857e-2d53-43af-872f-7c73008a0133" message="Failed Step" />
+						<logger level="INFO" doc:name="Logger" doc:id="f1a8c8e4-1e7e-4d75-9671-f26283266b38" message="#[payload]" />
+						<file:write doc:name="Write" doc:id="53321885-9472-4a33-81de-5b2896bde26d" config-ref="File_Config" path="/Users/dipankar/AnypointStudio/studio-workspace/first-mule-project/src/test/resources/failureResult.csv" mode="APPEND"/>
+					</batch:aggregator>
+				</batch:step>
+			</batch:process-records>
+		</batch:job>
+		<ee:transform doc:name="Transform Message" doc:id="fdb3560c-f7ee-4d08-a5e3-4bf3e8404101">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+	</flow>
+</mule>
